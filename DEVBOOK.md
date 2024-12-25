@@ -50,10 +50,11 @@ src/
 - [x] Interface optimization
 
 ## 4. Presentation Layer - User Interface
-### Browser Integration ⌛
-- [ ] Text highlighting system tests
-- [ ] Selection implementation
-- [ ] UX refinement
+### Browser Integration 🏗️
+- [x] Text highlighting system tests
+- [x] Selection implementation
+- [x] Context menu integration
+- [x] UX refinement
 
 ### Popup Interface 🏗️
 - [x] Definition display tests
