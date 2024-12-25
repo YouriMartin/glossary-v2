@@ -9,7 +9,12 @@ module.exports = {
   collectCoverageFrom: [
     'src/**/*.{ts,tsx}',
     '!src/**/*.d.ts',
-    '!src/**/*.test.{ts,tsx}'
+    '!src/**/*.test.{ts,tsx}',
+    '!src/__tests__/setup.ts'
+  ],
+  testMatch: [
+    '**/__tests__/**/*.test.ts?(x)',
+    '**/?(*.)+(spec|test).ts?(x)'
   ],
   coverageReporters: ['text', 'lcov'],
   coverageThreshold: {

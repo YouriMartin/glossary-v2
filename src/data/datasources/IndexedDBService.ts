@@ -1,19 +1,19 @@
 import { IIndexedDBService } from './IIndexedDBService';
 
-export class IndexedDBService implements IIndexedDBService {
+export class IndexedDBService<T> implements IIndexedDBService {
   private db: IDBDatabase | null = null;
   private readonly dbName: string;
   private readonly version: number;
   private readonly stores: string[];
 
-  constructor(dbName: string, version: number, stores: string[]) {
+  constructor(dbName: string = 'glossaryDB', version: number = 1, stores: string[] = ['entries']) {
     this.dbName = dbName;
     this.version = version;
     this.stores = stores;
   }
 
   async initialize(): Promise<void> {
-    return new Promise((resolve, reject) => {
+    return new Promise<void>((resolve, reject) => {
       const request = indexedDB.open(this.dbName, this.version);
 
       request.onerror = () => {
@@ -37,62 +37,93 @@ export class IndexedDBService implements IIndexedDBService {
     });
   }
 
-  async add(storeName: string, data: any): Promise<void> {
+  async add(storeName: string, data: T): Promise<void> {
     return this.executeTransaction(storeName, 'readwrite', (store) => {
-      store.put(data);
+      return new Promise<void>((resolve, reject) => {
+        const request = store.put(data);
+        request.onsuccess = () => resolve();
+        request.onerror = () => reject(new Error('Failed to add data'));
+      });
     });
   }
 
-  async get(storeName: string, key: string): Promise<any> {
+  async get(storeName: string, key: string): Promise<T | undefined> {
     return this.executeTransaction(storeName, 'readonly', (store) => {
-      return store.get(key);
+      return new Promise<T | undefined>((resolve, reject) => {
+        const request = store.get(key);
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(new Error('Failed to get data'));
+      });
     });
   }
 
-  async getAll(storeName: string): Promise<any[]> {
+  async getAll(storeName: string): Promise<T[]> {
     return this.executeTransaction(storeName, 'readonly', (store) => {
-      return store.getAll();
+      return new Promise<T[]>((resolve, reject) => {
+        const request = store.getAll();
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(new Error('Failed to get all data'));
+      });
     });
   }
 
   async delete(storeName: string, key: string): Promise<void> {
     return this.executeTransaction(storeName, 'readwrite', (store) => {
-      store.delete(key);
+      return new Promise<void>((resolve, reject) => {
+        const request = store.delete(key);
+        request.onsuccess = () => resolve();
+        request.onerror = () => reject(new Error('Failed to delete data'));
+      });
     });
   }
 
   async clear(storeName: string): Promise<void> {
     return this.executeTransaction(storeName, 'readwrite', (store) => {
-      store.clear();
+      return new Promise<void>((resolve, reject) => {
+        const request = store.clear();
+        request.onsuccess = () => resolve();
+        request.onerror = () => reject(new Error('Failed to clear store'));
+      });
     });
   }
 
-  private async executeTransaction(
+  private async executeTransaction<R>(
     storeName: string,
     mode: IDBTransactionMode,
-    operation: (store: IDBObjectStore) => void | Promise<any>
-  ): Promise<any> {
+    operation: (store: IDBObjectStore) => Promise<R>
+  ): Promise<R> {
     if (!this.db) {
       throw new Error('Database not initialized');
     }
 
-    return new Promise((resolve, reject) => {
+    return new Promise<R>((resolve, reject) => {
       const transaction = this.db!.transaction(storeName, mode);
       const store = transaction.objectStore(storeName);
 
-      try {
-        const result = operation(store);
-        
-        transaction.oncomplete = () => {
-          resolve(result);
-        };
+      let operationPromise: Promise<R>;
+      let transactionComplete = false;
+      let operationResult: R | undefined;
 
-        transaction.onerror = () => {
-          reject(new Error('Transaction failed'));
-        };
-      } catch (error) {
-        reject(error);
-      }
+      transaction.oncomplete = () => {
+        transactionComplete = true;
+        if (operationResult !== undefined) {
+          resolve(operationResult);
+        }
+      };
+
+      transaction.onerror = () => {
+        reject(new Error('Transaction failed'));
+      };
+
+      operationPromise = operation(store);
+      operationPromise
+        .then((result) => {
+          operationResult = result;
+          if (transactionComplete) {
+            resolve(result);
+          }
+        })
+        .catch(reject);
     });
   }
 }

@@ -1,3 +1,5 @@
+import { describe, it, expect } from '@jest/globals';
+
 // Mock Web Crypto API
 const mockSubtle = {
   importKey: jest.fn(),

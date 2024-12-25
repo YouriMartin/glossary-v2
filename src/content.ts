@@ -5,9 +5,14 @@ import { ManageEntryUseCase } from './domain/usecases/ManageEntryUseCase';
 import { GlossaryRepository } from './data/repositories/GlossaryRepository';
 import { IndexedDBService } from './data/datasources/IndexedDBService';
 import { CSVService } from './data/datasources/CSVService';
+import { Entry } from './domain/entities/Entry';
 
 // Initialize services
-const indexedDBService = new IndexedDBService();
+const indexedDBService = new IndexedDBService<Entry>();
+indexedDBService.initialize().catch(error => {
+  console.error('Failed to initialize IndexedDB:', error);
+});
+
 const csvService = new CSVService();
 const glossaryRepository = new GlossaryRepository(indexedDBService, csvService);
 const manageEntryUseCase = new ManageEntryUseCase(glossaryRepository);
