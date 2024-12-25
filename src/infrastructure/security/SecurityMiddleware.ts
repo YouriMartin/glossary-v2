@@ -1,4 +1,5 @@
 import { ISecurityService } from './ISecurityService';
+import { GlossaryEntry } from '../../domain/entities/GlossaryEntry';
 
 export class SecurityMiddleware {
   constructor(private securityService: ISecurityService) {}
@@ -103,6 +104,47 @@ export class SecurityMiddleware {
     } catch (error) {
       console.error('Content security check error:', error);
       return false;
+    }
+  }
+
+  async interceptSave(entry: GlossaryEntry): Promise<GlossaryEntry> {
+    // Valider l'opération
+    if (!(await this.validateOperation('save', entry))) {
+      throw new Error('Insufficient permissions');
+    }
+
+    // Valider le contenu
+    if (!(await this.checkContentSecurity(entry.definition))) {
+      throw new Error('Invalid content detected');
+    }
+
+    // Chiffrer la définition
+    const { ciphertext, iv } = await this.securityService.encryptData(entry.definition);
+    
+    return {
+      ...entry,
+      definition: `${ciphertext}::${iv}` // Stocker IV avec le texte chiffré
+    };
+  }
+
+  async interceptRetrieve(entry: GlossaryEntry): Promise<GlossaryEntry> {
+    try {
+      // Extraire le texte chiffré et l'IV
+      const [ciphertext, iv] = entry.definition.split('::');
+      
+      if (!ciphertext || !iv) {
+        throw new Error('Invalid encrypted data format');
+      }
+
+      // Déchiffrer la définition
+      const decryptedDefinition = await this.securityService.decryptData(ciphertext, iv);
+
+      return {
+        ...entry,
+        definition: decryptedDefinition
+      };
+    } catch (error) {
+      throw new Error('Decryption failed');
     }
   }
 }
