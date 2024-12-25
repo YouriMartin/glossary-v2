@@ -28,10 +28,10 @@ src/
 - [x] Implement core entities
 - [x] Refactor and optimize entities
 
-### Use Cases ⌛
-- [ ] Develop tests for glossary management
-- [ ] Implement use cases
-- [ ] Optimization and refactoring
+### Use Cases 🏗️
+- [x] Develop tests for glossary management
+- [x] Implement use cases
+- [x] Optimization and refactoring
 
 ## 3. Data Layer - Storage Implementation
 ### IndexedDB Integration ⌛
