@@ -23,10 +23,10 @@ src/
 ```
 
 ## 2. Domain Layer - Core Business Logic
-### Entity Development ⌛
-- [ ] Write tests for core entities (Glossary, Entry)
-- [ ] Implement core entities
-- [ ] Refactor and optimize entities
+### Entity Development 🏗️
+- [x] Write tests for core entities (Glossary, Entry)
+- [x] Implement core entities
+- [x] Refactor and optimize entities
 
 ### Use Cases ⌛
 - [ ] Develop tests for glossary management
