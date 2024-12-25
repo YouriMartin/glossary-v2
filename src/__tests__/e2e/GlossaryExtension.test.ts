@@ -1,7 +1,7 @@
 import { Builder, By, until, WebDriver } from 'selenium-webdriver';
-import { GlossaryRepository } from '../../data/repository/GlossaryRepository';
 import { SecurityService } from '../../infrastructure/security/SecurityService';
 import { SyncService } from '../../infrastructure/sync/SyncService';
+import { GlossaryRepository } from '../../data/repositories/GlossaryRepository';
 
 describe('Glossary Extension E2E Tests', () => {
   let driver: WebDriver;
