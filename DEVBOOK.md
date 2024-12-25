@@ -8,11 +8,11 @@ This document tracks the development progress of the Glossary browser extension 
 - ✅ Completed
 
 ## 1. Initial Setup with Clean Architecture
-### Configuration and Environment Setup ⌛
-- [ ] Initial TypeScript configuration tests
-- [ ] Environment setup implementation
-- [ ] Build system configuration
-- [ ] Project structure setup according to Clean Architecture
+### Configuration and Environment Setup 🏗️
+- [x] Initial TypeScript configuration tests
+- [x] Environment setup implementation
+- [x] Build system configuration
+- [x] Project structure setup according to Clean Architecture
 
 ```
 src/
