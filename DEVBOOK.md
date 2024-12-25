@@ -39,10 +39,15 @@ src/
 - [x] IndexedDB storage implementation
 - [x] Storage optimization
 
-### CSV Management ⌛
-- [ ] CSV parser tests
-- [ ] Import/Export implementation
-- [ ] Performance optimization
+### CSV Management 🏗️
+- [x] CSV parser tests
+- [x] Import/Export implementation
+- [x] CSV handling optimization
+
+### Popup Interface ⌛
+- [ ] Definition display tests
+- [ ] UI implementation
+- [ ] Interface optimization
 
 ## 4. Presentation Layer - User Interface
 ### Browser Integration ⌛

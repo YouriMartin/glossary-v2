@@ -1,10 +1,12 @@
 import { GlossaryRepository } from '../../../data/repositories/GlossaryRepository';
 import { IIndexedDBService } from '../../../data/datasources/IIndexedDBService';
+import { ICSVService } from '../../../data/datasources/ICSVService';
 import { Entry } from '../../../domain/entities/Entry';
 
 describe('GlossaryRepository', () => {
   let repository: GlossaryRepository;
   let mockDBService: jest.Mocked<IIndexedDBService>;
+  let mockCSVService: jest.Mocked<ICSVService>;
 
   beforeEach(() => {
     mockDBService = {
@@ -15,7 +17,14 @@ describe('GlossaryRepository', () => {
       delete: jest.fn(),
       clear: jest.fn(),
     };
-    repository = new GlossaryRepository(mockDBService);
+
+    mockCSVService = {
+      parse: jest.fn(),
+      stringify: jest.fn(),
+      validate: jest.fn(),
+    };
+
+    repository = new GlossaryRepository(mockDBService, mockCSVService);
   });
 
   describe('saveEntry', () => {
@@ -84,9 +93,14 @@ describe('GlossaryRepository', () => {
   });
 
   describe('importFromCSV', () => {
-    it('should import valid CSV content', async () => {
-      const csvContent = 'acronym,definition\nAPI,Application Programming Interface\nURL,Uniform Resource Locator';
+    it('should import entries from CSV content', async () => {
+      const entries = [
+        new Entry('API', 'Application Programming Interface'),
+        new Entry('URL', 'Uniform Resource Locator')
+      ];
+      mockCSVService.parse.mockResolvedValue(entries);
       
+      const csvContent = 'acronym,definition\nAPI,Application Programming Interface\nURL,Uniform Resource Locator';
       await repository.importFromCSV(csvContent);
 
       expect(mockDBService.clear).toHaveBeenCalled();
@@ -95,6 +109,7 @@ describe('GlossaryRepository', () => {
 
     it('should throw error for invalid CSV format', async () => {
       const invalidCSV = 'invalid,csv\nformat';
+      mockCSVService.parse.mockRejectedValue(new Error('Invalid CSV format'));
       
       await expect(repository.importFromCSV(invalidCSV))
         .rejects.toThrow('Invalid CSV format');
@@ -103,15 +118,17 @@ describe('GlossaryRepository', () => {
 
   describe('exportToCSV', () => {
     it('should export entries to CSV format', async () => {
-      const mockEntries = [
+      const entries = [
         new Entry('API', 'Application Programming Interface'),
         new Entry('URL', 'Uniform Resource Locator')
       ];
-      mockDBService.getAll.mockResolvedValue(mockEntries);
+      const expectedCSV = 'acronym,definition\nAPI,Application Programming Interface\nURL,Uniform Resource Locator';
+      
+      mockDBService.getAll.mockResolvedValue(entries);
+      mockCSVService.stringify.mockResolvedValue(expectedCSV);
 
       const csv = await repository.exportToCSV();
-      
-      expect(csv).toBe('acronym,definition\nAPI,Application Programming Interface\nURL,Uniform Resource Locator');
+      expect(csv).toBe(expectedCSV);
     });
   });
 });

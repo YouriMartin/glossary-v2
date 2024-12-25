@@ -1,11 +1,15 @@
 import { IGlossaryRepository } from '../../domain/repositories/IGlossaryRepository';
 import { Entry } from '../../domain/entities/Entry';
 import { IIndexedDBService } from '../datasources/IIndexedDBService';
+import { ICSVService } from '../datasources/ICSVService';
 
 export class GlossaryRepository implements IGlossaryRepository {
   private readonly STORE_NAME = 'glossary';
 
-  constructor(private dbService: IIndexedDBService) {}
+  constructor(
+    private dbService: IIndexedDBService,
+    private csvService: ICSVService
+  ) {}
 
   async initialize(): Promise<void> {
     await this.dbService.initialize();
@@ -49,37 +53,16 @@ export class GlossaryRepository implements IGlossaryRepository {
   }
 
   async importFromCSV(csvContent: string): Promise<void> {
-    const lines = csvContent.split('\n');
-    const headers = lines[0].split(',');
-    const acronymIndex = headers.indexOf('acronym');
-    const definitionIndex = headers.indexOf('definition');
-
-    if (acronymIndex === -1 || definitionIndex === -1) {
-      throw new Error('Invalid CSV format');
-    }
-
+    const entries = await this.csvService.parse(csvContent);
     await this.dbService.clear(this.STORE_NAME);
-
-    for (let i = 1; i < lines.length; i++) {
-      const values = lines[i].split(',');
-      if (values.length > 1) {
-        const acronym = values[acronymIndex].trim();
-        const definition = values[definitionIndex].trim();
-        if (acronym && definition) {
-          const entry = new Entry(acronym, definition);
-          await this.saveEntry(entry);
-        }
-      }
+    
+    for (const entry of entries) {
+      await this.saveEntry(entry);
     }
   }
 
   async exportToCSV(): Promise<string> {
     const entries = await this.getAllEntries();
-    const headers = ['acronym', 'definition'];
-    const rows = entries.map(entry => 
-      `${entry.acronym},${entry.definition}`
-    );
-    
-    return [headers.join(','), ...rows].join('\n');
+    return await this.csvService.stringify(entries);
   }
 }
