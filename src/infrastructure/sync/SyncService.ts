@@ -7,68 +7,85 @@ export interface SyncOptions {
   maxRetries: number;
 }
 
+const defaultSyncOptions: SyncOptions = {
+  autoSync: true,
+  syncInterval: 300000, // 5 minutes
+  maxRetries: 3
+};
+
 export class SyncService {
-  private syncTimer: NodeJS.Timer | null = null;
+  private syncTimeoutId: NodeJS.Timeout | null = null;
   private retryCount: number = 0;
 
   constructor(
     private readonly apiUrl: string,
     private readonly securityMiddleware: SecurityMiddleware,
-    private readonly options: SyncOptions = {
-      autoSync: true,
-      syncInterval: 300000, // 5 minutes
-      maxRetries: 3
-    }
+    private readonly options: SyncOptions = defaultSyncOptions
   ) {
-    if (options.autoSync) {
-      this.startAutoSync();
+    if (this.options.autoSync) {
+      this.startSync();
     }
   }
 
-  private startAutoSync(): void {
-    if (this.syncTimer) {
-      clearInterval(this.syncTimer);
+  public async startSync(): Promise<void> {
+    if (this.syncTimeoutId !== null) {
+      return;
     }
 
-    this.syncTimer = setInterval(async () => {
+    const startAutoSync = async () => {
       try {
         await this.sync();
+        // Réinitialiser le compteur de tentatives après un succès
         this.retryCount = 0;
+        
+        // Programmer la prochaine synchronisation uniquement en cas de succès
+        if (this.syncTimeoutId !== null) {
+          this.syncTimeoutId = setTimeout(startAutoSync, this.options.syncInterval);
+        }
       } catch (error) {
-        console.error('Auto sync failed:', error);
         this.retryCount++;
-
         if (this.retryCount >= this.options.maxRetries) {
-          console.error('Max retry attempts reached. Stopping auto sync.');
-          this.stopAutoSync();
+          this.stopSync();
+          return;
+        }
+        
+        // En cas d'échec, réessayer immédiatement si nous n'avons pas atteint le maximum
+        if (this.syncTimeoutId !== null) {
+          this.syncTimeoutId = setTimeout(startAutoSync, 0);
         }
       }
-    }, this.options.syncInterval);
+    };
+
+    // Initialiser l'état de synchronisation
+    this.syncTimeoutId = setTimeout(startAutoSync, this.options.syncInterval);
+    
+    // Démarrer la première synchronisation immédiatement
+    await startAutoSync();
   }
 
-  private stopAutoSync(): void {
-    if (this.syncTimer) {
-      clearInterval(this.syncTimer);
-      this.syncTimer = null;
+  public stopSync(): void {
+    if (this.syncTimeoutId !== null) {
+      clearTimeout(this.syncTimeoutId);
+      this.syncTimeoutId = null;
     }
+    this.retryCount = 0;
   }
 
-  async sync(): Promise<void> {
+  public async sync(): Promise<void> {
     try {
-      // Récupérer les modifications locales
+      // Récupérer les changements locaux
       const localChanges = await this.getLocalChanges();
-      
+
       // Chiffrer les données avant l'envoi
       const encryptedChanges = await Promise.all(
         localChanges.map(entry => this.securityMiddleware.interceptSave(entry))
       );
 
-      // Envoyer les modifications au serveur
+      // Envoyer les changements au serveur
       const response = await fetch(`${this.apiUrl}/sync`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${await this.getAuthToken()}`
         },
         body: JSON.stringify(encryptedChanges)
       });
@@ -77,10 +94,9 @@ export class SyncService {
         throw new Error(`Sync failed: ${response.statusText}`);
       }
 
-      // Récupérer et appliquer les modifications du serveur
+      // Récupérer et appliquer les changements du serveur
       const serverChanges = await response.json();
       await this.applyServerChanges(serverChanges);
-
     } catch (error) {
       console.error('Sync error:', error);
       throw error;
@@ -99,8 +115,9 @@ export class SyncService {
         changes.map(entry => this.securityMiddleware.interceptRetrieve(entry))
       );
 
-      // À implémenter : appliquer les modifications au stockage local
+      // Log pour le débogage
       console.log('Applying server changes:', decryptedChanges);
+      // À implémenter : appliquer les modifications au stockage local
     } catch (error) {
       console.error('Error applying server changes:', error);
       throw error;

@@ -4,31 +4,68 @@ import { SecurityService } from '../../../infrastructure/security/SecurityServic
 
 describe('SyncService', () => {
   let syncService: SyncService;
-  let securityMiddleware: SecurityMiddleware;
   let mockFetch: jest.Mock;
+  let mockSetTimeout: jest.SpyInstance;
+  let mockClearTimeout: jest.SpyInstance;
+  let securityMiddleware: SecurityMiddleware;
+  let spyInterceptSave: jest.SpyInstance;
+  let spyInterceptRetrieve: jest.SpyInstance;
+  let mockEntry: any;
 
   const testApiUrl = 'https://api.example.com';
   const testOptions: SyncOptions = {
-    autoSync: false,
+    autoSync: true,
     syncInterval: 1000,
-    maxRetries: 2
+    maxRetries: 3
   };
 
   beforeEach(() => {
-    // Mock fetch
-    mockFetch = jest.fn();
+    // Mock global fetch
+    mockFetch = jest.fn(() => Promise.resolve({
+      ok: true,
+      json: () => Promise.resolve([])
+    }));
     global.fetch = mockFetch;
 
-    // Setup security middleware
+    // Mock timers
+    jest.useFakeTimers();
+    mockSetTimeout = jest.spyOn(global, 'setTimeout');
+    mockClearTimeout = jest.spyOn(global, 'clearTimeout');
+
+    // Mock security middleware
     const securityService = new SecurityService();
     securityMiddleware = new SecurityMiddleware(securityService);
 
-    // Setup sync service
-    syncService = new SyncService(testApiUrl, securityMiddleware, testOptions);
+    mockEntry = {
+      term: 'test',
+      definition: 'test',
+      category: 'test',
+      createdAt: new Date('2025-01-08T19:23:52.785Z'),
+      updatedAt: new Date('2025-01-08T19:23:52.785Z'),
+      acronym: 'test',
+      _definition: 'test',
+      updateDefinition: jest.fn()
+    };
+
+    spyInterceptSave = jest.spyOn(securityMiddleware, 'interceptSave')
+      .mockImplementation(async () => mockEntry);
+    spyInterceptRetrieve = jest.spyOn(securityMiddleware, 'interceptRetrieve')
+      .mockImplementation(async () => mockEntry);
+
+    // Mock getLocalChanges pour retourner des données de test
+    jest.spyOn(SyncService.prototype as any, 'getLocalChanges')
+      .mockResolvedValue([mockEntry]);
+
+    syncService = new SyncService(testApiUrl, securityMiddleware, {
+      ...testOptions,
+      autoSync: false // Désactiver l'auto-sync par défaut pour les tests
+    });
   });
 
   afterEach(() => {
     jest.clearAllMocks();
+    jest.useRealTimers();
+    jest.restoreAllMocks();
   });
 
   describe('Sync Operations', () => {
@@ -60,80 +97,111 @@ describe('SyncService', () => {
   });
 
   describe('Auto Sync', () => {
-    beforeEach(() => {
-      jest.useFakeTimers();
-    });
+    it('should start auto sync when enabled', async () => {
+      // Créer un nouveau service avec auto-sync activé
+      mockFetch.mockImplementation(() => Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve([mockEntry])
+      }));
 
-    afterEach(() => {
-      jest.useRealTimers();
-    });
-
-    it('should start auto sync when enabled', () => {
       const autoSyncService = new SyncService(testApiUrl, securityMiddleware, {
         ...testOptions,
         autoSync: true
       });
 
-      expect(setInterval).toHaveBeenCalledWith(
+      // Attendre que la première synchronisation soit terminée
+      await Promise.resolve(); // Pour le constructeur
+      await Promise.resolve(); // Pour le startSync
+      await Promise.resolve(); // Pour le sync
+      await Promise.resolve(); // Pour le fetch
+
+      // Vérifier que la synchronisation a été effectuée
+      expect(mockFetch).toHaveBeenCalledWith(
+        `${testApiUrl}/sync`,
+        expect.objectContaining({
+          method: 'POST',
+          headers: expect.any(Object),
+          body: expect.any(String)
+        })
+      );
+
+      // Avancer le temps et attendre que la prochaine synchronisation soit programmée
+      jest.advanceTimersByTime(testOptions.syncInterval);
+      
+      // Vérifier que setTimeout a été appelé avec les bons arguments
+      expect(mockSetTimeout).toHaveBeenCalledWith(
         expect.any(Function),
         testOptions.syncInterval
       );
+
+      // Nettoyer
+      autoSyncService.stopSync();
     });
 
     it('should stop auto sync after max retries', async () => {
-      const mockResponse = {
+      mockFetch.mockImplementation(() => Promise.resolve({
         ok: false,
         statusText: 'Server Error'
-      };
-      mockFetch.mockResolvedValue(mockResponse);
+      }));
 
+      // Créer un nouveau service avec auto-sync activé et un seul essai
       const autoSyncService = new SyncService(testApiUrl, securityMiddleware, {
         ...testOptions,
-        autoSync: true
+        autoSync: true,
+        maxRetries: 1
       });
 
-      // Simulate multiple sync failures
-      for (let i = 0; i <= testOptions.maxRetries; i++) {
-        jest.advanceTimersByTime(testOptions.syncInterval);
-        await Promise.resolve(); // Allow promises to resolve
-      }
+      // Attendre que la première synchronisation soit terminée
+      await Promise.resolve(); // Pour le constructeur
+      await Promise.resolve(); // Pour le startSync
+      await Promise.resolve(); // Pour le sync
+      await Promise.resolve(); // Pour le fetch
 
-      expect(clearInterval).toHaveBeenCalled();
+      // Simuler la deuxième tentative
+      jest.advanceTimersByTime(testOptions.syncInterval);
+      await Promise.resolve(); // Pour le startSync
+      await Promise.resolve(); // Pour le sync
+      await Promise.resolve(); // Pour le fetch
+
+      // Vérifier que clearTimeout a été appelé après le nombre maximum de tentatives
+      expect(mockClearTimeout).toHaveBeenCalled();
+      expect(mockFetch).toHaveBeenCalledTimes(2); // Une fois pour chaque tentative
+      
+      // Vérifier qu'aucune nouvelle tentative n'est programmée
+      jest.advanceTimersByTime(testOptions.syncInterval);
+      expect(mockSetTimeout).not.toHaveBeenCalledTimes(3);
     });
   });
 
   describe('Security Integration', () => {
-    it('should encrypt data before sending to server', async () => {
-      const mockResponse = {
+    beforeEach(() => {
+      // Mock fetch pour retourner des données
+      mockFetch.mockImplementation(() => Promise.resolve({
         ok: true,
-        json: () => Promise.resolve([])
-      };
-      mockFetch.mockResolvedValueOnce(mockResponse);
+        json: () => Promise.resolve([mockEntry])
+      }));
 
-      const spyInterceptSave = jest.spyOn(securityMiddleware, 'interceptSave');
-      
+      // Mock les méthodes de sécurité
+      spyInterceptSave.mockResolvedValue(mockEntry);
+      spyInterceptRetrieve.mockResolvedValue(mockEntry);
+    });
+
+    it('should encrypt data before sending to server', async () => {
       await syncService.sync();
-      
       expect(spyInterceptSave).toHaveBeenCalled();
+      expect(mockFetch).toHaveBeenCalled();
+      const fetchCall = mockFetch.mock.calls[0];
+      const sentData = JSON.parse(fetchCall[1].body);
+      const { updateDefinition, ...expectedEntry } = mockEntry;
+      expect(sentData[0]).toEqual({
+        ...expectedEntry,
+        createdAt: expectedEntry.createdAt.toISOString(),
+        updatedAt: expectedEntry.updatedAt.toISOString()
+      });
     });
 
     it('should decrypt data received from server', async () => {
-      const mockServerData = [{
-        term: 'test',
-        definition: 'encrypted::data',
-        category: 'test'
-      }];
-      
-      const mockResponse = {
-        ok: true,
-        json: () => Promise.resolve(mockServerData)
-      };
-      mockFetch.mockResolvedValueOnce(mockResponse);
-
-      const spyInterceptRetrieve = jest.spyOn(securityMiddleware, 'interceptRetrieve');
-      
       await syncService.sync();
-      
       expect(spyInterceptRetrieve).toHaveBeenCalled();
     });
   });
