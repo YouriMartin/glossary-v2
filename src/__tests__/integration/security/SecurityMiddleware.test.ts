@@ -72,7 +72,7 @@ describe('Security Middleware Integration Tests', () => {
   let csvService: CSVService;
 
   // Timeout raisonnable pour les tests
-  jest.setTimeout(5000);
+  jest.setTimeout(3000);
 
   beforeEach(async () => {
     // Réinitialiser tous les mocks

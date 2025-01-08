@@ -1,5 +1,8 @@
 import { IndexedDBService } from '../../../data/datasources/IndexedDBService';
 
+// Timeout pour les tests d'intégration avec IndexedDB
+jest.setTimeout(3000);
+
 // Mock IndexedDB
 const mockIndexedDB = {
   open: jest.fn(),

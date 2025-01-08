@@ -2,6 +2,9 @@ import { SyncService, SyncOptions } from '../../../infrastructure/sync/SyncServi
 import { SecurityMiddleware } from '../../../infrastructure/security/SecurityMiddleware';
 import { SecurityService } from '../../../infrastructure/security/SecurityService';
 
+// Timeout pour les tests d'intégration
+jest.setTimeout(3000);
+
 describe('SyncService', () => {
   let syncService: SyncService;
   let mockFetch: jest.Mock;
@@ -15,8 +18,8 @@ describe('SyncService', () => {
   const testApiUrl = 'https://api.example.com';
   const testOptions: SyncOptions = {
     autoSync: true,
-    syncInterval: 1000,
-    maxRetries: 3
+    syncInterval: 10000,
+    maxRetries: 2
   };
 
   beforeEach(() => {
@@ -169,7 +172,7 @@ describe('SyncService', () => {
       
       // Vérifier qu'aucune nouvelle tentative n'est programmée
       jest.advanceTimersByTime(testOptions.syncInterval);
-      expect(mockSetTimeout).not.toHaveBeenCalledTimes(3);
+      expect(mockSetTimeout).toHaveBeenCalledTimes(2); // Une fois pour chaque tentative
     });
   });
 

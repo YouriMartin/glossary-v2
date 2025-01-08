@@ -1,5 +1,6 @@
 import { ImportExportUseCase } from '../../../domain/usecases/ImportExportUseCase';
 import { IGlossaryRepository } from '../../../domain/repositories/IGlossaryRepository';
+import { Entry } from '../../../domain/entities/Entry';
 
 describe('ImportExportUseCase', () => {
   let useCase: ImportExportUseCase;

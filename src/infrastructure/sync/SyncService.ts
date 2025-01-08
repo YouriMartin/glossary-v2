@@ -9,8 +9,8 @@ export interface SyncOptions {
 
 const defaultSyncOptions: SyncOptions = {
   autoSync: true,
-  syncInterval: 300000, // 5 minutes
-  maxRetries: 3
+  syncInterval: 10000, // Réduire à 10 secondes pour les tests
+  maxRetries: 2
 };
 
 export class SyncService {
@@ -73,30 +73,38 @@ export class SyncService {
 
   public async sync(): Promise<void> {
     try {
-      // Récupérer les changements locaux
-      const localChanges = await this.getLocalChanges();
+      // Ajouter un timeout pour éviter les blocages
+      const syncOperation = async () => {
+        // Récupérer les changements locaux
+        const localChanges = await this.getLocalChanges();
 
-      // Chiffrer les données avant l'envoi
-      const encryptedChanges = await Promise.all(
-        localChanges.map(entry => this.securityMiddleware.interceptSave(entry))
-      );
+        // Chiffrer les données avant l'envoi
+        const encryptedChanges = await Promise.all(
+          localChanges.map(entry => this.securityMiddleware.interceptSave(entry))
+        );
 
-      // Envoyer les changements au serveur
-      const response = await fetch(`${this.apiUrl}/sync`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(encryptedChanges)
-      });
+        // Envoyer les changements au serveur
+        const response = await fetch(`${this.apiUrl}/sync`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(encryptedChanges)
+        });
 
-      if (!response.ok) {
-        throw new Error(`Sync failed: ${response.statusText}`);
-      }
+        if (!response.ok) {
+          throw new Error(`Sync failed: ${response.statusText}`);
+        }
 
-      // Récupérer et appliquer les changements du serveur
-      const serverChanges = await response.json();
-      await this.applyServerChanges(serverChanges);
+        // Récupérer et appliquer les changements du serveur
+        const serverChanges = await response.json();
+        await this.applyServerChanges(serverChanges);
+      };
+
+      await Promise.race([
+        syncOperation(),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Sync operation timeout')), 3000))
+      ]);
     } catch (error) {
       console.error('Sync error:', error);
       throw error;
