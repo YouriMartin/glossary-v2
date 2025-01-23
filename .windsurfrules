@@ -1,0 +1,27 @@
+# Development Rules
+ - Never commit node_modules
+ - Never commit dist
+ - Never commit package-lock.json
+ - Enable eslint and prettier
+ - Enable strict mode
+ - Enable type checking
+ - Enable git secrets
+
+ ## TypeScript Rules
+ - Use strict mode
+ - Use type annotations
+ - Use interfaces
+ - Prefix interfaces with `I` (e.g., `IUser`, `IDatabaseEntry`)
+ - Use namespaces
+ - Use enums
+ - Use type guards
+ - Use type assertions
+ - Use type inference
+
+## Testing Rules
+- Use Jest for unit testing
+- Write test before code
+- When there are timeouts issue in test dont increase the timeout, find the issue in code
+
+## Git Rules
+- Use git secrets
